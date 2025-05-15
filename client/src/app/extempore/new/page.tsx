@@ -3,6 +3,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Video, Mic, Square, Play, Pause, UploadCloud, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
+import { storage } from '@/lib/firebase/client'; // Import Firebase storage instance
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { useRouter } from 'next/navigation'; // Import useRouter
+
+// Helper function to convert Blob to Data URL
+const blobToDataURL = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result) {
+        resolve(reader.result as string);
+      } else {
+        reject(new Error("Failed to convert blob to data URL."));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
 
 export default function NewExtemporePage() {
   const [isRecording, setIsRecording] = useState(false);
@@ -13,6 +32,10 @@ export default function NewExtemporePage() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [selectedMimeType, setSelectedMimeType] = useState<string>('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const router = useRouter(); // Initialize useRouter
 
   // Create a ref to store recording chunks
   const chunksRef = useRef<Blob[]>([]);
@@ -72,11 +95,14 @@ export default function NewExtemporePage() {
       return;
     }
     setError(null);
-    setRecordedBlob(null); // Clear previous recording
-    if (previewUrl) { // If a previous recording's URL exists
+    setUploadSuccess(null);
+    setRecordedBlob(null);
+    if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
     }
+    // Reset upload progress if starting a new recording
+    setUploadProgress(0);
 
     try {
       console.log('[NewExtemporePage] Requesting media devices...');
@@ -133,30 +159,16 @@ export default function NewExtemporePage() {
         console.log(`  ${type}: ${MediaRecorder.isTypeSupported(type)}`);
       });
 
-      let selectedMimeOption = '';
-      let recorderOptions = {};
-
+      let determinedMimeType = '';
       for (const mimeType of mimeOptions) {
         if (MediaRecorder.isTypeSupported(mimeType)) {
-          selectedMimeOption = mimeType;
-          recorderOptions = { mimeType };
-          console.log(`[NewExtemporePage] Selected MIME type for recording: ${mimeType}`);
+          determinedMimeType = mimeType;
           break;
         }
       }
+      if (!determinedMimeType) determinedMimeType = 'video/webm'; // Fallback
 
-      if (!selectedMimeOption) {
-        console.warn('[NewExtemporePage] None of the specified MIME types are supported. Using browser default. This might lead to issues.');
-        // No specific mimeType set, browser will use its default
-        // setSelectedMimeType(''); // Or a sensible default like 'video/webm'
-      }
-
-      setSelectedMimeType(selectedMimeOption); // Store the actually selected one, or empty if none explicitly supported/chosen
-      console.log('[NewExtemporePage] Effective MIME type for recording:', selectedMimeOption || 'browser default');
-      // The selectedMimeType state is set here, but for onstop, we'll prefer mediaRecorderRef.current.mimeType
-      // console.log('[NewExtemporePage] MIME type for blob creation will be:', selectedMimeType); // This log can be misleading due to state update timing
-
-      const recorder = new MediaRecorder(mediaStream, recorderOptions);
+      const recorder = new MediaRecorder(mediaStream, { mimeType: determinedMimeType });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -185,7 +197,7 @@ export default function NewExtemporePage() {
         }
 
         // Use the actual MIME type the recorder used.
-        const actualMimeType = mediaRecorderRef.current?.mimeType || selectedMimeType || 'video/webm';
+        const actualMimeType = mediaRecorderRef.current?.mimeType || determinedMimeType;
         console.log('[NewExtemporePage] Creating blob with MIME type:', actualMimeType);
         const blob = new Blob(chunksRef.current, { type: actualMimeType });
         console.log('[NewExtemporePage] recorder.onstop - final recordedBlob size:', blob.size, 'type:', blob.type);
@@ -221,7 +233,7 @@ export default function NewExtemporePage() {
         console.log(`[NewExtemporePage] Track: kind=${track.kind}, label="${track.label}", enabled=${track.enabled}, muted=${track.muted}, readyState=${track.readyState}`);
       });
 
-      recorder.start(); // Try without timeslice first
+      recorder.start();
       console.log('[NewExtemporePage] MediaRecorder started. State:', recorder.state);
       setIsRecording(true);
 
@@ -257,6 +269,8 @@ export default function NewExtemporePage() {
       }
     }
     setIsRecording(false);
+    setUploadSuccess(null); // Clear success message if starting a new recording flow
+    setUploadProgress(0);
   };
 
   const handleUpload = async () => {
@@ -265,9 +279,101 @@ export default function NewExtemporePage() {
       return;
     }
     setError(null);
-    console.log("Uploading recording...", recordedBlob);
-    // TODO: Implement Firebase Storage Upload (Step C)
-    alert("Upload functionality not implemented yet.");
+    setUploadSuccess(null);
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    const fileExtension = recordedBlob.type.split('/')[1]?.split(';')[0] || 'webm';
+    const uniqueFileName = `extempore_${Date.now()}.${fileExtension}`;
+    const storagePath = `recordings/${uniqueFileName}`;
+    const storageRef = ref(storage, storagePath);
+
+    console.log(`[NewExtemporePage] Starting upload to: ${storagePath} with type: ${recordedBlob.type}`);
+
+    const uploadTask = uploadBytesResumable(storageRef, recordedBlob, { contentType: recordedBlob.type });
+
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setUploadProgress(progress);
+        console.log('Upload is ' + progress + '% done');
+      },
+      (uploadError) => {
+        console.error("[NewExtemporePage] Firebase upload error:", uploadError);
+        // More specific error messages based on uploadError.code can be added here
+        // e.g., storage/unauthorized, storage/canceled, storage/unknown
+        let message = "Upload failed. Please try again.";
+        if (uploadError.code === 'storage/unauthorized') {
+            message = "Upload failed: Permission denied. Please ensure you are logged in and have upload rights.";
+        } else if (uploadError.code === 'storage/canceled') {
+            message = "Upload canceled.";
+        }
+        setError(message);
+        setIsUploading(false);
+        setUploadProgress(0);
+      },
+      async () => {
+        console.log("[NewExtemporePage] File uploaded successfully to Firebase Storage.");
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          console.log("[NewExtemporePage] Got download URL:", downloadURL);
+
+          const metadataPayload = {
+            storagePath: storagePath,
+            downloadURL: downloadURL,
+            fileName: uniqueFileName,
+            contentType: recordedBlob.type,
+            size: recordedBlob.size,
+            // userId: auth.currentUser?.uid, // TODO: Add when auth is integrated
+            createdAt: new Date().toISOString(),
+          };
+
+          // Now, send metadata to our backend API to store in Firestore
+          const metadataResponse = await fetch('/api/save-recording-metadata', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(metadataPayload),
+          });
+
+          const metadataResult = await metadataResponse.json();
+
+          if (!metadataResponse.ok || !metadataResult.success) {
+            throw new Error(metadataResult.error || "Failed to save recording metadata.");
+          }
+
+          setUploadSuccess(`Successfully uploaded: ${uniqueFileName} and saved metadata! ID: ${metadataResult.id}`);
+          console.log("[NewExtemporePage] Metadata saved successfully:", metadataResult);
+          
+          // Clear local recording state after successful upload and metadata save
+          setRecordedBlob(null);
+          if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+          }
+          chunksRef.current = [];
+
+          // Redirect to the analysis page
+          if (metadataResult.id) {
+            router.push(`/analysis/${metadataResult.id}`);
+          } else {
+            console.error("[NewExtemporePage] No ID returned from metadata save, cannot redirect.");
+            // Optionally set an error message for the user
+          }
+
+        } catch (errorAfterUpload) {
+          console.error("[NewExtemporePage] Error after upload (getting URL or saving metadata):", errorAfterUpload);
+          if (errorAfterUpload instanceof Error) {
+            setError(`Post-upload operation failed: ${errorAfterUpload.message}`);
+          } else {
+            setError("An unknown error occurred after uploading the file while finalizing.");
+          }
+        }
+        setIsUploading(false);
+        setUploadProgress(100); // Ensure progress shows 100% on completion
+      }
+    );
   };
 
   return (
@@ -306,17 +412,26 @@ export default function NewExtemporePage() {
 
       <div className="flex gap-4 mb-6">
         {!isRecording ? (
-          <Button onClick={handleStartRecording} size="lg" className="bg-green-500 hover:bg-green-600" disabled={!isClient || isRecording}>
+          <Button onClick={handleStartRecording} size="lg" className="bg-green-500 hover:bg-green-600" disabled={!isClient || isRecording || isUploading}>
             <Mic className="mr-2 h-5 w-5" /> Start Recording
           </Button>
         ) : (
-          <Button onClick={handleStopRecording} size="lg" variant="destructive" disabled={!isClient || !isRecording}>
+          <Button onClick={handleStopRecording} size="lg" variant="destructive" disabled={!isClient || !isRecording || isUploading}>
             <Square className="mr-2 h-5 w-5" /> Stop Recording
           </Button>
         )}
       </div>
 
-      {!isRecording && recordedBlob && (
+      {isUploading && (
+        <div className="w-full max-w-md p-4 my-4">
+          <div className="text-center mb-2">Uploading... {uploadProgress.toFixed(2)}%</div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+            <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+          </div>
+        </div>
+      )}
+
+      {!isRecording && recordedBlob && !uploadSuccess && (
         <div className="w-full max-w-2xl flex flex-col items-center gap-4 p-4 border border-dashed rounded-lg">
           <h2 className="text-xl font-semibold">Preview Recording</h2>
           <video
@@ -333,9 +448,25 @@ export default function NewExtemporePage() {
           <div className="text-sm text-gray-500">
             Recording size: {(recordedBlob.size / 1024).toFixed(2)} KB | Type: {recordedBlob.type}
           </div>
-          <Button onClick={handleUpload} size="lg" className="bg-blue-500 hover:bg-blue-600">
-            <UploadCloud className="mr-2 h-5 w-5" /> Upload to Cloud
+          <Button onClick={handleUpload} size="lg" className="bg-blue-500 hover:bg-blue-600" disabled={isUploading || !recordedBlob}>
+            {isUploading ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Processing...
+              </>
+            ) : (
+              <>
+                <UploadCloud className="mr-2 h-5 w-5" /> Upload to Cloud
+              </>
+            )}
           </Button>
+        </div>
+      )}
+
+      {uploadSuccess && (
+        <div className="w-full max-w-2xl bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md mb-4" role="alert">
+          <p className="font-bold">Success!</p>
+          <p className="text-sm">{uploadSuccess}</p>
         </div>
       )}
     </div>
