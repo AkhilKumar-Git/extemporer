@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useReactMediaRecorder } from 'react-media-recorder';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,10 +13,11 @@ interface RecordingInterfaceProps {
 const MIN_RECORDING_TIME_SECONDS = 60;
 
 export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubmitting }: RecordingInterfaceProps) {
-  const [timeLeft, setTimeLeft] = React.useState(MIN_RECORDING_TIME_SECONDS);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [canStopRecording, setCanStopRecording] = React.useState(false);
   const [permissionError, setPermissionError] = React.useState(false);
   const [currentMediaBlobUrl, setCurrentMediaBlobUrl] = React.useState<string | null>(null);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     status,
@@ -29,36 +30,55 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
     audio: true,
     askPermissionOnMount: false,
     onStop: (blobUrl, blob) => {
-      setCurrentMediaBlobUrl(blobUrl); // Keep a local copy
+      setCurrentMediaBlobUrl(blobUrl);
       onRecordingComplete(blobUrl, blob);
+      if (recordingTimerRef.current) {
+        clearTimeout(recordingTimerRef.current);
+      }
     },
     onStart: () => {
       setCanStopRecording(false);
-      setTimeLeft(MIN_RECORDING_TIME_SECONDS);
       setPermissionError(false);
-      setCurrentMediaBlobUrl(null); // Clear previous blob url
+      setCurrentMediaBlobUrl(null);
+      if (recordingTimerRef.current) {
+        clearTimeout(recordingTimerRef.current);
+      }
+      recordingTimerRef.current = setTimeout(() => {
+        setCanStopRecording(true);
+      }, MIN_RECORDING_TIME_SECONDS * 1000);
     },
   });
 
-  React.useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (status === 'recording' && timeLeft > 0) {
-      timer = setTimeout(() => {
-        setTimeLeft((prevTime) => prevTime - 1);
-      }, 1000);
-    } else if (status === 'recording' && timeLeft === 0) {
-      setCanStopRecording(true);
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      if (previewStream) {
+        const currentSrcObject = videoElement.srcObject as MediaStream | null;
+        if (!currentSrcObject || (currentSrcObject.id !== previewStream.id)) {
+          videoElement.srcObject = previewStream;
+        }
+      } else {
+        if (videoElement.srcObject) {
+          videoElement.srcObject = null;
+        }
+      }
     }
-    return () => clearTimeout(timer);
-  }, [status, timeLeft]);
+  }, [previewStream]);
+
+  React.useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearTimeout(recordingTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleStart = async () => {
     setPermissionError(false);
     setCurrentMediaBlobUrl(null);
     try {
-      // Check permissions first
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      stream.getTracks().forEach(track => track.stop()); // Release tracks
+      stream.getTracks().forEach(track => track.stop());
       libStartRecording();
     } catch (error: any) {
       console.error("Permissions error:", error);
@@ -72,8 +92,6 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
     libStopRecording();
   };
 
-  // If isSubmitting is true (passed from parent), show a global loading state.
-  // This component itself doesn't know about the submission to Firebase, only recording completion.
   if (isSubmitting) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
@@ -94,7 +112,6 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
     );
   }
   
-  // Show video player if recording is stopped and blob URL is available
   if (status === 'stopped' && currentMediaBlobUrl) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
@@ -106,8 +123,6 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
           <video src={currentMediaBlobUrl} controls playsInline className="w-full rounded-lg aspect-video" />
           <div className="flex gap-3">
             <Button onClick={handleStart} variant="outline" className="w-full"> <Play className="mr-2 h-4 w-4"/> Record Again</Button>
-            {/* The parent component will handle the actual submission using onRecordingComplete */}
-            {/* This UI assumes the parent shows a global loading/submitting state if needed */}
           </div>
            <p className="text-xs text-muted-foreground text-center">Your recording is ready. The analysis will begin after it's submitted (handled by the page).</p>
         </CardContent>
@@ -132,18 +147,18 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
         )}
 
         <div className="aspect-video bg-slate-800 dark:bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center shadow-inner">
-          {(status === 'idle' || status === 'acquiring_media' || (!previewStream && status !== 'recording')) && (
-            <div className="text-center text-slate-500 dark:text-slate-400 p-4">
+          <video
+            ref={videoRef}
+            autoPlay playsInline muted className="w-full h-full object-cover"
+          />
+
+          {(status === 'idle' || status === 'acquiring_media') && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-slate-500 dark:text-slate-400 p-4 bg-slate-800 dark:bg-slate-900">
               <Video className="mx-auto h-16 w-16 mb-2 opacity-70" />
               <p className="font-medium">Video Preview Area</p>
+              {status === 'idle' && <p className="text-sm mt-1">Click Start Recording to show preview.</p>}
               {status === 'acquiring_media' && <p className="text-sm mt-1">Accessing camera...</p>}
             </div>
-          )}
-          {previewStream && status !== 'stopped' && (
-            <video
-              ref={(instance) => { if (instance && previewStream) instance.srcObject = previewStream; }}
-              autoPlay playsInline muted className="w-full h-full object-cover"
-            />
           )}
           {status === 'recording' && (
             <div className="absolute top-3 right-3 bg-red-600 text-white text-xs px-2.5 py-1 rounded-full flex items-center shadow font-medium">
@@ -154,12 +169,8 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
 
         {status === 'recording' && (
           <div className="text-center p-3 bg-secondary dark:bg-secondary/70 rounded-lg">
-            <p className={`text-3xl font-bold tabular-nums ${timeLeft === 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground'}`}>
-              {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {timeLeft > 0 ? "Minimum recording time: ends in " : "You can now stop the recording."}
-              {timeLeft > 0 && <span className="font-semibold">{timeLeft}s</span>}
+            <p className="text-sm text-muted-foreground mt-1">
+              {canStopRecording ? "You can now stop the recording." : `Minimum recording time: ${MIN_RECORDING_TIME_SECONDS} seconds. The stop button will enable then.`}
             </p>
           </div>
         )}
@@ -174,13 +185,13 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
           {status === 'recording' && (
             <Button 
               onClick={handleStop} 
-              disabled={timeLeft > 0 && !canStopRecording} 
-              variant={timeLeft === 0 || canStopRecording ? "destructive" : "secondary"}
+              disabled={!canStopRecording} 
+              variant={canStopRecording ? "destructive" : "secondary"}
               size="lg"
               className="w-full sm:flex-1"
             >
              <StopCircle className="mr-2 h-5 w-5" /> 
-             {timeLeft > 0 && !canStopRecording ? `Stop (in ${timeLeft}s)` : "Stop Recording"}
+             {canStopRecording ? "Stop Recording" : `Stop Recording (Enabled after ${MIN_RECORDING_TIME_SECONDS}s)`}
             </Button>
           )}
         </div>

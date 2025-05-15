@@ -7,6 +7,8 @@ import '@/styles/globals.css'
 import { Sidebar } from '@/components/Sidebar'
 import { Header } from '@/components/Header'
 import { usePathname } from 'next/navigation'
+import { AuthManager } from '@/components/AuthManager'
+import NextAuthProvider from '@/app/context/NextAuthProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -33,17 +35,20 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <ClientProviders>
-          <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-            {!isAuthPage && <Sidebar />}
-            <div className="flex flex-col flex-grow">
-              {!isAuthPage && <Header />}
-              <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">
-                {children}
-              </main>
+        <NextAuthProvider>
+          <AuthManager />
+          <ClientProviders>
+            <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
+              {!isAuthPage && <Sidebar />}
+              <div className="flex flex-col flex-grow">
+                {!isAuthPage && <Header />}
+                <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">
+                  {children}
+                </main>
+              </div>
             </div>
-          </div>
-        </ClientProviders>
+          </ClientProviders>
+        </NextAuthProvider>
       </body>
     </html>
   )

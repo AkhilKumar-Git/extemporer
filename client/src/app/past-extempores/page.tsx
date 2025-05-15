@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { PlayCircle, MessageSquareText, BarChart3, Loader2 } from "lucide-react"; // Icons
 import { useSession } from 'next-auth/react';
-import { db as firestore } from '@/lib/firebase';
+import { db as firestore, auth as firebaseAuth } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 
 interface Recording {
@@ -62,18 +62,25 @@ const formatDate = (timestamp: string | undefined | null): string => { // Change
 // ];
 
 export default function PastExtemporesPage() {
-  const { data: session, status: authStatus } = useSession();
+  const { data: session, status } = useSession();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  console.log("NextAuth Session:", session);
+  console.log("NextAuth Status:", status);
+  console.log("Firebase Auth Current User:", firebaseAuth.currentUser);
+  if (firebaseAuth.currentUser) {
+    console.log("Firebase Auth Current User UID:", firebaseAuth.currentUser.uid);
+  }
+
   useEffect(() => {
-    if (authStatus === 'loading') {
+    if (status === 'loading') {
       setLoading(true);
       return;
     }
 
-    if (authStatus === 'unauthenticated' || !session || !session.user || !session.user.id) {
+    if (status === 'unauthenticated' || !session || !session.user || !session.user.id) {
       setError("Please log in to view your past extempores.");
       setRecordings([]);
       setLoading(false);
@@ -111,7 +118,7 @@ export default function PastExtemporesPage() {
     };
     fetchRecordings();
 
-  }, [session, authStatus]);
+  }, [session, status]);
 
   if (loading) { // Simplified loading check
     return (
@@ -127,7 +134,7 @@ export default function PastExtemporesPage() {
       <div className="flex flex-col items-center justify-center h-64">
         <MessageSquareText className="h-12 w-12 text-destructive" />
         <p className="mt-4 text-destructive">{error}</p>
-        {authStatus !== 'authenticated' && (
+        {status !== 'authenticated' && (
              <Link href="/auth/signin" className="mt-4">
                 <Button>Login</Button>
             </Link>

@@ -17,7 +17,7 @@ export default function HomePage() {
   }, [session, status, router]);
 
   const handleStartExtempore = () => {
-    router.push('/extempore/new'); // Updated route
+    router.push('/record?topic=test'); // Updated route
     // console.log('Start New Extempore button clicked!'); 
     // Implement navigation or modal opening logic here
   };
