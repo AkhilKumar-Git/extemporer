@@ -1,25 +1,26 @@
 import { Router } from 'express'
-import { z } from 'zod'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
-import { prisma } from '../lib/prisma'
-import { config } from '../config'
-import { validateRequest } from '../middleware/validate'
+// import { z } from 'zod' // Commented out if only used by register/login schemas
+// import bcrypt from 'bcryptjs' // Commented out
+// import jwt from 'jsonwebtoken' // Commented out
+// import { prisma } from '../lib/prisma' // Commented out if only used by register/login
+// import { config } from '../config' // Commented out if only jwtSecret was used here
+// import { validateRequest } from '../middleware/validate' // Commented out if only used by register/login
 
 const router = Router()
 
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string().min(2),
-  role: z.enum(['user', 'coach']).default('user'),
-})
+// const registerSchema = z.object({ // Commented out
+//   email: z.string().email(), // Commented out
+//   password: z.string().min(8), // Commented out
+//   name: z.string().min(2), // Commented out
+//   role: z.enum(['user', 'coach']).default('user'), // Commented out
+// }) // Commented out
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
-})
+// const loginSchema = z.object({ // Commented out
+//   email: z.string().email(), // Commented out
+//   password: z.string(), // Commented out
+// }) // Commented out
 
+/* // Commenting out entire register route
 router.post('/register', validateRequest(registerSchema), async (req, res) => {
   const { email, password, name, role } = req.body
 
@@ -44,13 +45,15 @@ router.post('/register', validateRequest(registerSchema), async (req, res) => {
 
   const token = jwt.sign(
     { userId: user.id, role: user.role },
-    config.jwtSecret,
+    config.jwtSecret!,
     { expiresIn: '1d' }
   )
 
   res.status(201).json({ token })
 })
+*/
 
+/* // Commenting out entire login route
 router.post('/login', validateRequest(loginSchema), async (req, res) => {
   const { email, password } = req.body
 
@@ -70,11 +73,17 @@ router.post('/login', validateRequest(loginSchema), async (req, res) => {
 
   const token = jwt.sign(
     { userId: user.id, role: user.role },
-    config.jwtSecret,
+    config.jwtSecret!,
     { expiresIn: '1d' }
   )
 
   res.json({ token })
 })
+*/
+
+// Add a placeholder route to ensure the router is still functional
+router.get('/status', (req, res) => {
+  res.json({ status: 'Auth service is running, Firebase Auth is primary.' });
+});
 
 export const authRouter = router 

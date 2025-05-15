@@ -1,7 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import { recordingRouter } from './routes/recording'
-import { errorHandler } from './middleware/error'
+// import { errorHandler } from './middleware/error' // Commented out: middleware directory does not exist
 import { config } from './config'
 
 const app = express()
@@ -13,7 +13,7 @@ app.use(express.json())
 app.use('/api/recordings', recordingRouter)
 
 // Error handling
-app.use(errorHandler)
+// app.use(errorHandler) // Commented out: middleware directory does not exist
 
 const PORT = config.port || 3002
 

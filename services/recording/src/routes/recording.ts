@@ -1,10 +1,10 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { Storage } from '@google-cloud/storage'
-import { SpeechClient } from '@google-cloud/speech'
+// import { SpeechClient } from '@google-cloud/speech' // Commented out
 import { prisma } from '../lib/prisma'
 import { config } from '../config'
-import { analyzeRecording } from '../services/analysis'
+// import { analyzeRecording } from '../services/analysis' // Commented out
 import { validateRequest } from '../middleware/validate'
 import { z } from 'zod'
 
@@ -15,9 +15,9 @@ const storage = new Storage({
   keyFilename: config.googleCloudKeyFile,
 })
 
-const speechClient = new SpeechClient({
-  keyFilename: config.googleCloudKeyFile,
-})
+// const speechClient = new SpeechClient({ // Commented out
+//   keyFilename: config.googleCloudKeyFile, // Commented out
+// }) // Commented out
 
 const bucket = storage.bucket(config.storageBucket)
 
@@ -60,9 +60,10 @@ router.post(
       })
 
       // Start analysis
-      const analysis = await analyzeRecording(recording.id, file.buffer)
+      // const analysis = await analyzeRecording(recording.id, file.buffer) // Commented out
 
-      res.status(201).json({ recordingId: recording.id, analysis })
+      // res.status(201).json({ recordingId: recording.id, analysis }) // Modified to send only recordingId
+      res.status(201).json({ recordingId: recording.id, analysis: {dummy: "analysis to be implemented"} }) // Send dummy analysis
     } catch (error) {
       console.error('Error processing recording:', error)
       res.status(500).json({ message: 'Error processing recording' })

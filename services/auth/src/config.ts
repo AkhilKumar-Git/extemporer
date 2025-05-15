@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
 const configSchema = z.object({
-  port: z.string().default('3001'),
+  port: z.string().default('3004'),
   nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
-  jwtSecret: z.string(),
-  databaseUrl: z.string(),
+  jwtSecret: z.string().optional(),
+  databaseUrl: z.string().optional(),
 })
 
 const envConfig = {
