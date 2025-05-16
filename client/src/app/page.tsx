@@ -1,26 +1,21 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button'; // Assuming you have a Button component
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
 
-  useEffect(() => {
-    if (status === 'loading') return; // Do nothing while loading
-    if (!session) {
-      router.replace('/auth/signin');
-    }
-  }, [session, status, router]);
+  // useEffect(() => {
+  //   if (status === 'loading') return; // Do nothing while loading
+  //   if (!session) {
+  //     router.replace('/auth/signin');
+  //   }
+  // }, [session, status, router]);
 
-  const handleStartExtempore = () => {
-    router.push('/record?topic=test'); // Updated route
-    // console.log('Start New Extempore button clicked!'); 
-    // Implement navigation or modal opening logic here
-  };
+ 
 
   if (status === 'loading') {
     return <p>Loading session...</p>; // Or a spinner
@@ -35,12 +30,7 @@ export default function HomePage() {
   // If session exists, user is authenticated
   return (
     <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <Button onClick={handleStartExtempore} size="lg">
-          Start New Extempore
-        </Button>
-      </div>
+
       <p className="mb-6">Welcome, {session.user?.name || session.user?.email}!</p>
       
       {/* Placeholder for other dashboard content */}

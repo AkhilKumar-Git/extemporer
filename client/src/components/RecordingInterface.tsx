@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useReactMediaRecorder } from 'react-media-recorder';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +6,7 @@ import { AlertCircle, Video, Mic, UploadCloud, Play, StopCircle } from 'lucide-r
 
 interface RecordingInterfaceProps {
   extemporeTopic: string;
-  onRecordingComplete: (blobUrl: string, blob: Blob) => void;
+  onRecordingComplete: (blobUrl: string, blob: Blob | null, durationInSeconds?: number) => void;
   isSubmitting?: boolean; // Optional: to show a global submitting state if parent handles it
 }
 
@@ -14,10 +14,11 @@ const MIN_RECORDING_TIME_SECONDS = 60;
 
 export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubmitting }: RecordingInterfaceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [canStopRecording, setCanStopRecording] = React.useState(false);
-  const [permissionError, setPermissionError] = React.useState(false);
-  const [currentMediaBlobUrl, setCurrentMediaBlobUrl] = React.useState<string | null>(null);
+  const [canStopRecording, setCanStopRecording] = useState(false);
+  const [permissionError, setPermissionError] = useState(false);
+  const [currentMediaBlobUrl, setCurrentMediaBlobUrl] = useState<string | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingStartTimeRef = useRef<number | null>(null);
 
   const {
     status,
@@ -31,12 +32,24 @@ export function RecordingInterface({ extemporeTopic, onRecordingComplete, isSubm
     askPermissionOnMount: false,
     onStop: (blobUrl, blob) => {
       setCurrentMediaBlobUrl(blobUrl);
-      onRecordingComplete(blobUrl, blob);
       if (recordingTimerRef.current) {
         clearTimeout(recordingTimerRef.current);
       }
+
+      let durationInSeconds = 0;
+      if (recordingStartTimeRef.current) {
+        const stopTime = Date.now();
+        durationInSeconds = (stopTime - recordingStartTimeRef.current) / 1000;
+        recordingStartTimeRef.current = null;
+        console.log('[RecordingInterface] Calculated duration (timer):', durationInSeconds);
+      } else {
+        console.warn('[RecordingInterface] Recording start time was not set. Duration will be 0.');
+      }
+      
+      onRecordingComplete(blobUrl, blob, durationInSeconds);
     },
     onStart: () => {
+      recordingStartTimeRef.current = Date.now();
       setCanStopRecording(false);
       setPermissionError(false);
       setCurrentMediaBlobUrl(null);

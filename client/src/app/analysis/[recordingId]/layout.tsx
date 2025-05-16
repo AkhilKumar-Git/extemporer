@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Share2, Copy, AlertTriangle, Loader2 } from 'lucide-react';
 import { db as firestore } from '@/lib/firebase';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import CustomReactPlayer from '@/components/VideoPlayer/CustomReactPlayer';
 
 // Updated interface to match Firestore data structure
 interface RecordingData {
@@ -18,6 +19,7 @@ interface RecordingData {
   fileName?: string;
   createdAt: string;
   status?: string;
+  durationSeconds?: number;
   // For now, transcript will be handled by dummy data in child components or fetched separately
   // transcriptSnippets?: Array<{ time: string; text: string; highlighted?: string[] }>;
 }
@@ -61,11 +63,12 @@ export default function AnalysisPageLayout({
           const docSnap = await getDoc(recordingRef);
 
           if (docSnap.exists()) {
-            const data = docSnap.data() as Omit<RecordingData, 'id' | 'createdAt'> & { createdAt: Timestamp };
+            const data = docSnap.data() as Omit<RecordingData, 'id' | 'createdAt'> & { createdAt: Timestamp; durationSeconds?: number };
             setRecording({
               id: docSnap.id,
               ...data,
               createdAt: data.createdAt.toDate().toISOString(),
+              durationSeconds: data.durationSeconds && isFinite(data.durationSeconds) ? data.durationSeconds : undefined,
             } as RecordingData);
           } else {
             setError("Recording not found.");
@@ -159,9 +162,16 @@ export default function AnalysisPageLayout({
           <div className="lg:col-span-2 space-y-6">
             <Card className="overflow-hidden shadow-lg">
               <div className="aspect-video bg-slate-900">
-                <video src={recording.videoUrl} controls className="w-full h-full" poster="/placeholder-video-thumb.png">
-                  Your browser does not support the video tag.
-                </video>
+                {recording?.videoUrl ? (
+                  <CustomReactPlayer 
+                    url={recording.videoUrl} 
+                    initialDuration={recording.durationSeconds}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-400">
+                    Video not available.
+                  </div>
+                )}
               </div>
             </Card>
             <Card>

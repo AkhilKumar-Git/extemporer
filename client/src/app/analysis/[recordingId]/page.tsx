@@ -6,6 +6,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/client'; // Import auth as well
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+// import ReactPlayer from 'react-player/lazy'; // No longer needed here
+// import CustomReactPlayer from '@/components/VideoPlayer/CustomReactPlayer'; // No longer needed in page.tsx
 
 // Define an interface for your recording data structure
 interface RecordingDetails {
@@ -31,6 +33,11 @@ export default function AnalysisPage() {
   const [recording, setRecording] = useState<RecordingDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // const [isClient, setIsClient] = useState(false); // No longer needed here
+
+  // useEffect(() => {
+  //   setIsClient(true); // No longer needed here
+  // }, []);
 
   useEffect(() => {
     if (recordingId) {
@@ -133,24 +140,8 @@ export default function AnalysisPage() {
       <div className="flex flex-col md:flex-row gap-6">
         {/* Left Column (2/3 width) */} 
         <div className="w-full md:w-2/3 bg-muted/20 p-4 rounded-lg shadow">
-          {/* Video Preview */} 
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold mb-3">Video Preview</h2>
-            {recording.downloadURL ? (
-              <video 
-                src={recording.downloadURL} 
-                controls 
-                className="w-full rounded aspect-video bg-black shadow-md"
-              >
-                Your browser does not support the video tag.
-              </video>
-            ) : (
-              <div className="w-full aspect-video bg-gray-200 flex items-center justify-center rounded text-gray-500">
-                Video preview not available.
-              </div>
-            )}
-          </div>
-
+          {/* Video Preview Section Removed - Now handled by layout.tsx */}
+          
           {/* Transcript Placeholder */} 
           <div>
             <h2 className="text-2xl font-semibold mb-3">Transcript</h2>

@@ -14,13 +14,20 @@
     "lint": "turbo run lint"
   },
   "devDependencies": {
-    "turbo": "^1.10.0",
-    "typescript": "^5.0.4",
-    "prettier": "^2.8.8",
     "husky": "^8.0.3",
-    "lint-staged": "^13.2.2"
+    "lint-staged": "^13.2.2",
+    "prettier": "^2.8.8",
+    "turbo": "^1.10.0",
+    "typescript": "^5.0.4"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.1.0",
+    "@mui/material": "^7.1.0",
+    "react-player": "^2.16.0"
   }
-} 
+}

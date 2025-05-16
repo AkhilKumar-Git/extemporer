@@ -9,6 +9,7 @@ import { useSession } from 'next-auth/react';
 import { storage, db as firestore } from '@/lib/firebase'; // Assuming your firebase init exports 'storage' and 'firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import type { Recording } from '@/types'; // Import the Recording type
 
 // // Dummy function to simulate file upload to Firebase Storage
 // async function uploadVideoToFirebase(blob: Blob, userId: string, topic: string): Promise<{ videoUrl: string, recordingId: string }> {
@@ -44,14 +45,17 @@ export default function RecordExtemporePage() {
   // const DUMMY_USER_ID = "user123"; 
   const extemporeTopic = "Tell me about a time you faced a significant challenge and how you overcame it."; // Example topic
 
-  const handleRecordingComplete = async (blobUrl: string, blob: Blob) => {
+  const handleRecordingComplete = async (blobUrl: string, blob: Blob | null, durationInSeconds?: number) => {
     if (!blob) {
       setError("No recording data received. Please try again.");
+      setIsSubmitting(false);
+      setUploadProgress(null);
       return;
     }
     if (!session?.user?.id) {
       setError("User not authenticated. Please log in.");
-      // router.push('/auth/signin'); // Optionally redirect to sign-in
+      setIsSubmitting(false);
+      setUploadProgress(null);
       return;
     }
     setError(null);
@@ -59,10 +63,14 @@ export default function RecordExtemporePage() {
     setUploadProgress(0);
 
     const userId = session.user.id;
+    
+    // No need to pre-generate Firestore ID if not linking for server-side function
+    // const recordingDocRef = firestoreDoc(collection(firestore, 'recordings'));
+    // const recordingId = recordingDocRef.id;
 
     try {
-      // Step 1: Upload to Firebase Storage
-      const fileName = `${userId}_${Date.now()}.webm`;
+      // Simpler filename if not embedding Firestore ID for server-side function
+      const fileName = `${userId}_${Date.now()}.webm`; 
       const storageRef = ref(storage, `recordings/${userId}/${fileName}`);
       const uploadTask = uploadBytesResumable(storageRef, blob);
 
@@ -79,28 +87,45 @@ export default function RecordExtemporePage() {
           setUploadProgress(null);
         },
         async () => {
-          // Upload completed successfully, now get the download URL
           const videoUrl = await getDownloadURL(uploadTask.snapshot.ref);
           console.log('File available at', videoUrl);
-          setUploadProgress(100); // Mark as complete
+          setUploadProgress(100); 
 
-          // Step 2: Save metadata to Firestore
           const recordingsCol = collection(firestore, 'recordings');
-          const docRef = await addDoc(recordingsCol, {
+          // Use a more specific type, aligning with the Recording interface
+          const docData: Partial<Recording> = {
             userId,
-            topic: extemporeTopic,
+            title: extemporeTopic, // Using 'title' as per Recording interface, assuming topic is the title for now
             videoUrl,
-            fileName, // Optional: store filename for reference
             createdAt: serverTimestamp(),
-            status: 'completed', // Initial status
-            // Add any other relevant metadata, e.g., duration if available
-            // title, description if you plan to allow users to add them
-          });
+            uploadStatus: 'completed', // Renamed from 'status'
+            
+            // Initialize AI Analysis Fields
+            processingStatus: 'pending',
+            transcript: undefined, 
+            transcriptText: undefined,
+            eyeContact: undefined,
+            centering: undefined,
+            pacing: undefined,
+            pauses: undefined,
+            selectedScenario: undefined,
+            achievedGoals: undefined,
+            coachFeedback: undefined,
+            overallAnalysis: undefined,
+            processingError: undefined,
+            // thumbnailUrl, transcodedVideoUrl, audioUrl will be populated by backend functions
+          };
+
+          if (durationInSeconds && isFinite(durationInSeconds) && durationInSeconds > 0) {
+            docData.durationSeconds = parseFloat(durationInSeconds.toFixed(2));
+            console.log('[RecordPage] Saving timer-based duration to Firestore:', docData.durationSeconds);
+          } else {
+            console.warn('[RecordPage] Timer-based duration not valid or <=0, not saving. Received:', durationInSeconds);
+          }
           
+          const docRef = await addDoc(recordingsCol, docData);
           console.log(`Recording metadata saved with ID: ${docRef.id}`);
-          
-          // Step 3: Navigate to the analysis page
-          router.push(`/analysis/${docRef.id}/coaching`);
+          router.push(`/analysis/${docRef.id}/coaching`); 
         }
       );
 

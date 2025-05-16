@@ -16,6 +16,7 @@ import { useSession } from 'next-auth/react'; // For getting user ID
 import { db as firestore } from '@/lib/firebase'; // Firebase instance
 import { collection, query, where, orderBy, getDocs, Timestamp, limit } from 'firebase/firestore'; // Added limit
 import { Loader2, VideoIcon, AlertTriangle } from 'lucide-react'; // Added icons
+import { useRouter } from 'next/navigation';
 
 // Interface for Recording data (can be shared or defined locally)
 interface Recording {
@@ -42,7 +43,7 @@ export default function DashboardPage() {
   const [recentRecordings, setRecentRecordings] = useState<Recording[]>([]);
   const [recordingsLoading, setRecordingsLoading] = useState(true);
   const [recordingsError, setRecordingsError] = useState<string | null>(null);
-
+  const router = useRouter();
   // Dummy data for coaching report
   const coachingReport = {
     repetition: {
@@ -62,6 +63,7 @@ export default function DashboardPage() {
       message: "In the past week, you used repeated sentence starters on average of 2 times per yoodli.",
     },
   };
+
 
   useEffect(() => {
     if (authStatus === 'loading') {
@@ -114,14 +116,19 @@ export default function DashboardPage() {
     fetchRecentRecordings();
   }, [session, authStatus]);
 
+  const handleStartExtempore = () => {
+    router.push('/record?topic=test'); // Updated route
+    // console.log('Start New Extempore button clicked!'); 
+    // Implement navigation or modal opening logic here
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Your coaching report from the last week</h1>
-        {/* Add a dropdown for week/month/year later if needed */}
-        <Link href="/dashboard/focus-analytics">
-          <Button variant="outline">See dashboard</Button>
-        </Link>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <Button onClick={handleStartExtempore} size="lg">
+          Start New Extempore
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
