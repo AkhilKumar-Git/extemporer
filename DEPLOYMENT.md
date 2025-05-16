@@ -11,7 +11,7 @@ This guide provides instructions for deploying the Extempore AI Coach Next.js ap
 
 ## Environment Variables
 
-Your Next.js application (`client/`) requires Firebase configuration. These should be stored in `client/.env.local` for local development and set as environment variables in your deployment platform.
+Your Next.js application requires Firebase configuration. These should be stored in `.env.local` at the project root for local development and set as environment variables in your deployment platform.
 
 **Required Firebase Variables:**
 ```env
@@ -49,10 +49,9 @@ Vercel is a platform from the creators of Next.js, optimized for Next.js applica
     - Vercel will automatically detect that it's a Next.js project.
 
 4.  **Configure Project Settings:**
-    - **Root Directory:** If your Next.js app is in the `client/` subdirectory of your repository, set the "Root Directory" to `client` in Vercel's project settings. Otherwise, if your `package.json` and `next.config.js` are at the root of what Vercel sees, this might not be needed.
-        *To be precise, if your Git repository root is `extempored/` and your Next.js app is `extempored/client/`, then in Vercel settings for the project, under "General" -> "Root Directory", specify `client`.*
+    - **Root Directory:** Should be left as the default (repository root), as your Next.js application is now at the root.
     - **Build & Output Settings:** Vercel usually auto-detects these correctly for Next.js.
-        - Build Command: `npm run build` or `yarn build` (within the context of the Root Directory).
+        - Build Command: `npm run build` or `yarn build`.
         - Output Directory: `.next` (default for Next.js).
         - Install Command: `npm install` or `yarn install`.
     - **Environment Variables:** Add all the Firebase and NextAuth.js environment variables listed above through the Vercel project dashboard (Settings -> Environment Variables).
@@ -76,10 +75,10 @@ Google Cloud Run allows you to run containerized applications in a serverless en
 
 ### Steps:
 
-1.  **Create a `Dockerfile` in your `client/` directory:**
+1.  **Create a `Dockerfile` at the project root:**
 
     ```dockerfile
-    # client/Dockerfile
+    # Dockerfile (at project root)
 
     # Install dependencies only when needed
     FROM node:18-alpine AS deps
@@ -140,11 +139,11 @@ Google Cloud Run allows you to run containerized applications in a serverless en
 
     CMD ["node", "server.js"]
     ```
-    *(Note: This is a standard Next.js standalone Dockerfile. Ensure `output: 'standalone'` is in your `client/next.config.js` if not already present for optimal image size).* You might need to adjust if your `next.config.js` is not set for standalone output.
+    *(Note: This is a standard Next.js standalone Dockerfile. Ensure `output: 'standalone'` is in your `next.config.js` if not already present for optimal image size).*
 
-2.  **(Optional but Recommended) Configure `client/next.config.js` for standalone output:**
+2.  **(Optional but Recommended) Configure `next.config.js` (at project root) for standalone output:**
     ```javascript
-    // client/next.config.js
+    // next.config.js
     /** @type {import('next').NextConfig} */
     const nextConfig = {
       // ... other configurations
@@ -155,11 +154,11 @@ Google Cloud Run allows you to run containerized applications in a serverless en
     ```
 
 3.  **Build and Push the Docker Image:**
-    Navigate to your `client/` directory in the terminal.
+    Navigate to your project root directory in the terminal.
     ```bash
     # Replace YOUR_GCP_PROJECT_ID and YOUR_IMAGE_NAME accordingly
     export GCP_PROJECT_ID="YOUR_GCP_PROJECT_ID"
-    export IMAGE_NAME="extempore-client"
+    export IMAGE_NAME="extempore-app" # Changed from extempore-client
     export IMAGE_TAG="gcr.io/${GCP_PROJECT_ID}/${IMAGE_NAME}:latest" # For Container Registry
     # Or for Artifact Registry (recommended):
     # export REGION="your-gcp-region" # e.g., us-central1
@@ -202,5 +201,5 @@ Google Cloud Run allows you to run containerized applications in a serverless en
 
 ## Troubleshooting
 
-- **Vercel:** Check the build logs in the Vercel dashboard for any errors. Ensure environment variables are correctly set and the Root Directory is correct.
+- **Vercel:** Check the build logs in the Vercel dashboard for any errors. Ensure environment variables are correctly set.
 - **Cloud Run:** Use Google Cloud Logging to check for container logs. Ensure the Docker image builds successfully and environment variables are correctly passed to the Cloud Run service. 

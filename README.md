@@ -8,7 +8,7 @@ Many people struggle with extempore speaking, which is crucial in various profes
 
 ## Solution Overview
 
-Extempore AI Coach allows users to record video and audio of their speeches. These recordings are then (or will be) analyzed using AI to provide detailed, actionable feedback on aspects like clarity, conciseness, eye contact, pacing, and use of filler words. The platform is built with Next.js for the frontend and leverages Firebase for backend services (Authentication, Firestore Database, Cloud Storage).
+Extempore AI Coach allows users to record video and audio of their speeches. These recordings are then (or will be) analyzed using AI to provide detailed, actionable feedback on aspects like clarity, conciseness, eye contact, pacing, and use of filler words. The platform is built with Next.js and leverages Firebase for backend services (Authentication, Firestore Database, Cloud Storage).
 
 ## Features
 
@@ -33,11 +33,11 @@ Extempore AI Coach allows users to record video and audio of their speeches. The
 
 ## Project Structure
 
-The primary application is a Next.js project located in the `client/` directory.
+This project is a Next.js application. All application code resides in the `src/` directory at the project root.
 
 ## Tech Stack
 
-- **Frontend & Application Logic (`client/`):**
+- **Application Logic & Frontend:**
   - Next.js (React framework)
   - TypeScript
   - Material UI for UI components
@@ -56,27 +56,26 @@ The primary application is a Next.js project located in the `client/` directory.
 ## Local Development Setup
 
 1.  **Prerequisites:**
-    - Node.js (version specified in the root `package.json` `engines` field, e.g., >=18.0.0)
+    - Node.js (version specified in `package.json` `engines` field, e.g., >=18.0.0)
     - npm or yarn
     - Firebase project set up with Authentication, Firestore, and Cloud Storage enabled.
 
 2.  **Clone the repository:**
     ```bash
     git clone <repository_url>
-    cd extempored
+    cd extempore-ai-coach # Or your repository name
     ```
 
 3.  **Install dependencies:**
-    From the root directory:
+    From the project root directory:
     ```bash
     npm install 
     # or
     # yarn install
     ```
-    This will install dependencies, including those for the `client` app.
 
 4.  **Set up Firebase Environment Variables:**
-    - Create a file `client/.env.local`.
+    - Create a file `.env.local` at the project root.
     - Populate it with your Firebase project's configuration. Example:
       ```env
       NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
@@ -94,13 +93,13 @@ The primary application is a Next.js project located in the `client/` directory.
     - Ensure your Firebase app has web credentials configured.
 
 5.  **Run the development server:**
-    From the root directory:
+    From the project root directory:
     ```bash
     npm run dev
     # or
     # yarn dev 
     ```
-    This will start the Next.js development server for the `client` app (typically on `http://localhost:3000`).
+    This will start the Next.js development server (typically on `http://localhost:3000`).
 
 ## Deployment
 
