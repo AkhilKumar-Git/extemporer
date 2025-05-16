@@ -1,133 +1,206 @@
 # Extempore AI Coach Deployment Guide
 
+This guide provides instructions for deploying the Extempore AI Coach Next.js application.
+
 ## Prerequisites
 
-- Docker and Docker Compose
-- Google Cloud Platform account with Speech-to-Text API enabled
-- PostgreSQL (for local development)
-- Node.js 18+
+- Node.js (version specified in `package.json` `engines` field, e.g., >=18.0.0)
+- npm or yarn
+- A Firebase project with Authentication, Firestore, and Cloud Storage enabled.
+- Git repository for your project (e.g., on GitHub, GitLab, Bitbucket).
 
-## Environment Setup
+## Environment Variables
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/extempored.git
-cd extempored
+Your Next.js application (`client/`) requires Firebase configuration. These should be stored in `client/.env.local` for local development and set as environment variables in your deployment platform.
+
+**Required Firebase Variables:**
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id # Optional
 ```
 
-2. Create environment files:
-
-For the client (.env.local):
-```
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
-NEXT_PUBLIC_AUTH_URL=http://localhost:3001
-NEXT_PUBLIC_RECORDING_URL=http://localhost:3002
+**NextAuth.js Variables (if applicable):**
+```env
+NEXTAUTH_URL=your_production_url # e.g., https://your-app.vercel.app
+NEXTAUTH_SECRET=a_very_secure_random_string # Generate a strong secret for production
+# Add other NextAuth.js provider credentials (Google, etc.) as needed
 ```
 
-For the auth service (services/auth/.env):
-```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/extempored_auth
-JWT_SECRET=your-secure-jwt-secret
-PORT=3001
-```
+---
 
-For the recording service (services/recording/.env):
-```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/extempored_recording
-GOOGLE_CLOUD_PROJECT=your-project-id
-PORT=3002
-```
+## Option 1: Deploying to Vercel (Recommended for Next.js)
 
-3. Set up Google Cloud credentials:
-- Create a service account in Google Cloud Console
-- Download the JSON key file
-- Save it as `google-credentials.json` in the project root
+Vercel is a platform from the creators of Next.js, optimized for Next.js applications.
 
-## Development Setup
+### Steps:
 
-1. Install dependencies:
-```bash
-npm install
-```
+1.  **Push your code to a Git repository** (e.g., GitHub).
 
-2. Initialize the databases:
-```bash
-cd services/auth
-npx prisma migrate dev
-cd ../recording
-npx prisma migrate dev
-```
+2.  **Sign up or log in to Vercel** using your Git provider account.
 
-3. Start the development servers:
-```bash
-npm run dev
-```
+3.  **Import your project:**
+    - Click on "Add New..." -> "Project".
+    - Select your Git repository.
+    - Vercel will automatically detect that it's a Next.js project.
 
-## Production Deployment
+4.  **Configure Project Settings:**
+    - **Root Directory:** If your Next.js app is in the `client/` subdirectory of your repository, set the "Root Directory" to `client` in Vercel's project settings. Otherwise, if your `package.json` and `next.config.js` are at the root of what Vercel sees, this might not be needed.
+        *To be precise, if your Git repository root is `extempored/` and your Next.js app is `extempored/client/`, then in Vercel settings for the project, under "General" -> "Root Directory", specify `client`.*
+    - **Build & Output Settings:** Vercel usually auto-detects these correctly for Next.js.
+        - Build Command: `npm run build` or `yarn build` (within the context of the Root Directory).
+        - Output Directory: `.next` (default for Next.js).
+        - Install Command: `npm install` or `yarn install`.
+    - **Environment Variables:** Add all the Firebase and NextAuth.js environment variables listed above through the Vercel project dashboard (Settings -> Environment Variables).
 
-1. Build and start the containers:
-```bash
-docker-compose up -d --build
-```
+5.  **Deploy:** Click the "Deploy" button. Vercel will build and deploy your application.
 
-2. Initialize the databases:
-```bash
-docker-compose exec auth npx prisma migrate deploy
-docker-compose exec recording npx prisma migrate deploy
-```
+6.  **Custom Domain (Optional):** Once deployed, you can assign a custom domain through the Vercel dashboard.
 
-3. The services will be available at:
-- Client: http://localhost:3000
-- Auth Service: http://localhost:3001
-- Recording Service: http://localhost:3002
+---
 
-## Monitoring and Maintenance
+## Option 2: Deploying to Google Cloud Run
 
-1. View logs:
-```bash
-docker-compose logs -f
-```
+Google Cloud Run allows you to run containerized applications in a serverless environment.
 
-2. Update services:
-```bash
-git pull
-docker-compose up -d --build
-```
+### Prerequisites:
 
-3. Backup databases:
-```bash
-docker-compose exec db pg_dump -U postgres extempored_auth > backup_auth.sql
-docker-compose exec db pg_dump -U postgres extempored_recording > backup_recording.sql
-```
+- Google Cloud Platform (GCP) account with billing enabled.
+- `gcloud` CLI installed and authenticated (`gcloud auth login`, `gcloud config set project YOUR_PROJECT_ID`).
+- Docker installed locally.
+- Google Artifact Registry or Container Registry enabled in your GCP project.
 
-## Security Considerations
+### Steps:
 
-1. Update the JWT secret in production
-2. Secure the Google Cloud credentials
-3. Use HTTPS in production
-4. Regularly update dependencies
-5. Monitor system resources and logs
+1.  **Create a `Dockerfile` in your `client/` directory:**
+
+    ```dockerfile
+    # client/Dockerfile
+
+    # Install dependencies only when needed
+    FROM node:18-alpine AS deps
+    # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+    RUN apk add --no-cache libc6-compat
+    WORKDIR /app
+
+    # Install dependencies based on the preferred package manager
+    COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+    RUN \
+      if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+      elif [ -f package-lock.json ]; then npm ci; \
+      elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i --frozen-lockfile; \
+      else echo "Lockfile not found." && exit 1; \
+      fi
+
+
+    # Rebuild the source code only when needed
+    FROM node:18-alpine AS builder
+    WORKDIR /app
+    COPY --from=deps /app/node_modules ./node_modules
+    COPY . .
+
+    # Next.js collects completely anonymous telemetry data about general usage.
+    # Learn more here: https://nextjs.org/telemetry
+    # Uncomment the following line in case you want to disable telemetry during build.
+    ENV NEXT_TELEMETRY_DISABLED 1
+
+    RUN npm run build
+
+    # Production image, copy all the files and run next
+    FROM node:18-alpine AS runner
+    WORKDIR /app
+
+    ENV NODE_ENV production
+    # Uncomment the following line in case you want to disable telemetry during runtime.
+    ENV NEXT_TELEMETRY_DISABLED 1
+
+    RUN addgroup --system --gid 1001 nodejs
+    RUN adduser --system --uid 1001 nextjs
+
+    COPY --from=builder /app/public ./public
+
+    # Set the correct permission for prerender cache
+    RUN mkdir .next
+    RUN chown nextjs:nodejs .next
+
+    # Automatically leverage output traces to reduce image size
+    # https://nextjs.org/docs/advanced-features/output-file-tracing
+    COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+    COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+    USER nextjs
+
+    EXPOSE 3000
+
+    ENV PORT 3000
+
+    CMD ["node", "server.js"]
+    ```
+    *(Note: This is a standard Next.js standalone Dockerfile. Ensure `output: 'standalone'` is in your `client/next.config.js` if not already present for optimal image size).* You might need to adjust if your `next.config.js` is not set for standalone output.
+
+2.  **(Optional but Recommended) Configure `client/next.config.js` for standalone output:**
+    ```javascript
+    // client/next.config.js
+    /** @type {import('next').NextConfig} */
+    const nextConfig = {
+      // ... other configurations
+      output: 'standalone',
+    };
+
+    module.exports = nextConfig;
+    ```
+
+3.  **Build and Push the Docker Image:**
+    Navigate to your `client/` directory in the terminal.
+    ```bash
+    # Replace YOUR_GCP_PROJECT_ID and YOUR_IMAGE_NAME accordingly
+    export GCP_PROJECT_ID="YOUR_GCP_PROJECT_ID"
+    export IMAGE_NAME="extempore-client"
+    export IMAGE_TAG="gcr.io/${GCP_PROJECT_ID}/${IMAGE_NAME}:latest" # For Container Registry
+    # Or for Artifact Registry (recommended):
+    # export REGION="your-gcp-region" # e.g., us-central1
+    # export ARTIFACT_REPO_NAME="your-artifact-repo-name"
+    # export IMAGE_TAG="${REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO_NAME}/${IMAGE_NAME}:latest"
+
+    # Build the image (ensure Docker daemon is running)
+    docker build -t ${IMAGE_TAG} .
+
+    # Authenticate Docker with GCP (if using Artifact Registry, first time setup might be needed)
+    gcloud auth configure-docker ${REGION}-docker.pkg.dev # For Artifact Registry (replace ${REGION})
+    # Or for Container Registry (gcr.io)
+    # gcloud auth configure-docker
+
+    # Push the image
+    docker push ${IMAGE_TAG}
+    ```
+
+4.  **Deploy to Cloud Run:**
+    ```bash
+    gcloud run deploy ${IMAGE_NAME} \
+      --image ${IMAGE_TAG} \
+      --platform managed \
+      --region YOUR_GCP_REGION  # e.g., us-central1, us-east1
+      --allow-unauthenticated # To make it publicly accessible, or configure IAM for access control
+      --port 3000 # The port your app listens on inside the container
+      # Set environment variables (repeat --set-env-vars for each)
+      --set-env-vars="NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key" \
+      --set-env-vars="NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain" \
+      # ... add all other Firebase and NextAuth.js variables
+      --set-env-vars="NEXTAUTH_URL=YOUR_CLOUD_RUN_SERVICE_URL" # This will be provided after first deploy or set manually
+      --set-env-vars="NEXTAUTH_SECRET=your_production_secret"
+    ```
+    - After deployment, Cloud Run will provide a URL for your service. You might need to update `NEXTAUTH_URL` with this service URL and redeploy if it's dynamically generated and required at build/runtime by NextAuth.
+
+## Firebase Setup for Deployed App
+
+- **Authentication:** Ensure your production URL (from Vercel or Cloud Run) is added to the authorized domains in Firebase Authentication settings.
+- **Firestore/Storage Security Rules:** Review and ensure your security rules are appropriate for a production environment, allowing access only to authenticated users as needed.
 
 ## Troubleshooting
 
-1. If services fail to start:
-- Check logs: `docker-compose logs [service_name]`
-- Verify environment variables
-- Ensure ports are available
-
-2. Database connection issues:
-- Check database credentials
-- Verify database is running
-- Check network connectivity
-
-3. Recording analysis fails:
-- Verify Google Cloud credentials
-- Check API quotas
-- Validate input file format
-
-## Support
-
-For issues and support:
-- Create an issue in the GitHub repository
-- Contact the development team
-- Check the documentation 
+- **Vercel:** Check the build logs in the Vercel dashboard for any errors. Ensure environment variables are correctly set and the Root Directory is correct.
+- **Cloud Run:** Use Google Cloud Logging to check for container logs. Ensure the Docker image builds successfully and environment variables are correctly passed to the Cloud Run service. 

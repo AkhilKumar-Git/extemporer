@@ -2,32 +2,20 @@
   "name": "extempored",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "client",
-    "services/*"
-  ],
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "start": "turbo run start",
-    "test": "turbo run test",
-    "lint": "turbo run lint"
+    "dev": "npm run dev --workspace=@extempored/client",
+    "build": "npm run build --workspace=@extempored/client",
+    "start": "npm run start --workspace=@extempored/client",
+    "test": "echo \"Test script needs to be configured in client/package.json\" && npm run test --workspace=@extempored/client --if-present",
+    "lint": "npm run lint --workspace=@extempored/client"
   },
   "devDependencies": {
     "husky": "^8.0.3",
     "lint-staged": "^13.2.2",
     "prettier": "^2.8.8",
-    "turbo": "^1.10.0",
     "typescript": "^5.0.4"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.0",
-    "@mui/icons-material": "^7.1.0",
-    "@mui/material": "^7.1.0",
-    "react-player": "^2.16.0"
   }
 }
